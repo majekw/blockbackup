@@ -75,8 +75,6 @@ if [ -z "$SOURCE" -o -z "$DEST" ]; then usage; fi
 echo "Doing incremental backup of device $SOURCE to directory $DEST with chunk size $CHUNK"
 
 
-TMPFILE=/tmp/blockbackup.tmp
-
 TODAY=$(date +%F_%H%M%S)
 
 cd $DEST
@@ -99,22 +97,23 @@ while true; do
     mkdir -p $TODAY/$NEWDIR
     
     #read chunk
-    dd if=$SOURCE of=${TMPFILE} count=1 bs=${CHUNK} skip=${STARTCHUNK}  1>/dev/null 2>&1
+    dd if=$SOURCE of=${TODAY}/${NEWDIR}/${NEWNAME} count=1 bs=${CHUNK} skip=${STARTCHUNK}  1>/dev/null 2>&1
     if [ $? -ne 0 ]; then
 	#error or eof
-	echo "koniec"
+	echo "end of source or error"
 	break
     else
-	${ZCAT} ${BASE}/${NEWDIR}/${NEWNAME}${ZEXT} 2>/dev/null|cmp ${TMPFILE} 1>/dev/null 2>&1
+	${ZCAT} ${BASE}/${NEWDIR}/${NEWNAME}${ZEXT} 2>/dev/null|cmp ${TODAY}/${NEWDIR}/${NEWNAME} 1>/dev/null 2>&1
 	if [ $? -eq 0 ]; then
-	    #the same - make hardlink
+	    #the same - remove and make hardlink to old one
+	    rm ${TODAY}/${NEWDIR}/${NEWNAME}
 	    ln -v ${BASE}/${NEWDIR}/${NEWNAME}${ZEXT} ${TODAY}/${NEWDIR}/${NEWNAME}${ZEXT}
 	    if [ $DO_MD5 -eq 1 ]; then
 		ln $BASE/$NEWDIR/$NEWNAME.md5 $TODAY/$NEWDIR/$NEWNAME.md5
 	    fi
 	else
-	    #not the same - copy new
-	    cp -v $TMPFILE $TODAY/$NEWDIR/$NEWNAME
+	    #not the same - leave it
+	    echo "new"
 	    if [ $DO_MD5 -eq 1 ]; then
 		md5sum $TODAY/$NEWDIR/$NEWNAME >$TODAY/$NEWDIR/$NEWNAME.md5
 	    fi
@@ -138,5 +137,3 @@ fi
 rm lastsync 1>/dev/null 2>&1
 ln -s ${TODAY} lastsync
 
-#clean up
-rm $TMPFILE
