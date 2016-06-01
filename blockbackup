@@ -9,6 +9,7 @@ CHUNK=128k
 DO_MD5=1
 ZCAT=cat
 ZEXT=
+NUMZIPS=4
 
 
 function usage() {
@@ -18,6 +19,7 @@ function usage() {
     echo "	-d|--dest	destination directory"
     echo "	-z|--zip	compress every block right after read/compare"
     echo "	-za|--zip-after	compress new blocks at the end of process"
+    echo "	-n|--num-zips	run maximum N zip processess in parallel (default=4)"
     echo "	-c|--chunk	chunk size (default=128k)"
     echo "	-nm|--no-md5	don't generate md5 for every chunk"
     exit 1
@@ -59,6 +61,10 @@ while true; do
 	    ;;
 	-nm|--no-md5)
 	    DO_MD5=0
+	    ;;
+	-n|--num-zips)
+	    shift
+	    NUMZIPS=$(($1))
 	    ;;
 	*)
 	    usage
@@ -113,13 +119,17 @@ while true; do
 	    fi
 	else
 	    #not the same - leave it
-	    echo "new"
+	    echo "new $TODAY/$NEWDIR/$NEWNAME"
 	    if [ $DO_MD5 -eq 1 ]; then
 		md5sum $TODAY/$NEWDIR/$NEWNAME >$TODAY/$NEWDIR/$NEWNAME.md5
 	    fi
 	    if [ $USE_ZIP -eq 1 ]; then
 		#zip instantly
-		gzip -9 $TODAY/$NEWDIR/$NEWNAME
+		if [ $(jobs|wc -l) -lt $NUMZIPS ]; then
+		    gzip -9 $TODAY/$NEWDIR/$NEWNAME &
+		else
+		    gzip -9 $TODAY/$NEWDIR/$NEWNAME
+		fi
 	    fi
 	fi
 	STARTCHUNK=$(( $STARTCHUNK+1 ))
@@ -129,7 +139,13 @@ done
 if [ $USE_ZIP -eq 2 ]; then
     #zip everything after
     echo "zipping everything"
-    find $TODAY -type f -regex '.*[0-9][0-9]$' -exec gzip -9v {} \;
+    find $TODAY -type f -regex '.*[0-9][0-9]$'|while read tozip; do
+	if [ $(jobs|wc -l) -le $NUMZIPS ]; then
+	    gzip -9v $tozip &
+	else
+	    gzip -9v $tozip
+	fi
+    done
 fi
 
 
