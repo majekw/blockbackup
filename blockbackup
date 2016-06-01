@@ -1,0 +1,142 @@
+#!/bin/bash
+
+
+USE_ZIP=0
+SOURCE=
+DESC=
+DEDUP=0
+CHUNK=128k
+DO_MD5=1
+ZCAT=cat
+ZEXT=
+
+
+function usage() {
+    echo "ERROR: unknown option/paramter"
+    echo "Usage: blockbackup.sh -s device -d directory [-z|-za] [-c chunk] [-mn]"
+    echo "	-s|--source	source device"
+    echo "	-d|--dest	destination directory"
+    echo "	-z|--zip	compress every block right after read/compare"
+    echo "	-za|--zip-after	compress new blocks at the end of process"
+    echo "	-c|--chunk	chunk size (default=128k)"
+    echo "	-nm|--no-md5	don't generate md5 for every chunk"
+    exit 1
+}
+
+
+#get/parse parameters
+while true; do
+    case "$1" in
+	-z|--zip)
+	    USE_ZIP=1
+	    ZCAT=zcat
+	    ZEXT=.gz
+	    ;;
+	-za|--zip-after)
+	    USE_ZIP=2
+	    ZCAT=zcat
+	    ZEXT=.gz
+	    ;;
+	-s|--source)
+	    shift
+	    SOURCE="$1"
+	    if [ ! -b "$SOURCE" ]; then
+		echo "ERROR: source must be device!"
+		exit 1
+	    fi
+	    ;;
+	-d|--dest)
+	    shift
+	    DEST="$1"
+	    if [ ! -d "$DEST" ]; then
+		echo "ERROR: destination must be existing directory"
+		exit 1
+	    fi
+	    ;;
+	-c|--chunk)
+	    shift
+	    CHUNK=$1
+	    ;;
+	-nm|--no-md5)
+	    DO_MD5=0
+	    ;;
+	*)
+	    usage
+	    ;;
+    esac
+    shift
+    if [ -z "$1" ]; then break; fi
+done
+
+if [ -z "$SOURCE" -o -z "$DEST" ]; then usage; fi
+
+
+
+echo "Doing incremental backup of device $SOURCE to directory $DEST with chunk size $CHUNK"
+
+
+TMPFILE=/tmp/blockbackup.tmp
+
+TODAY=$(date +%F_%H%M%S)
+
+cd $DEST
+mkdir ${TODAY}
+
+#base
+if [ -L lastsync ]; then
+    BASE=$(readlink lastsync)
+else
+    BASE=""
+fi
+
+
+#START COPY
+STARTCHUNK=0
+while true; do
+    NEWNAME=$(printf "%08d\n" $STARTCHUNK)
+    echo -n "$NEWNAME : "
+    NEWDIR=${NEWNAME:0:5}
+    mkdir -p $TODAY/$NEWDIR
+    
+    #read chunk
+    dd if=$SOURCE of=${TMPFILE} count=1 bs=${CHUNK} skip=${STARTCHUNK}  1>/dev/null 2>&1
+    if [ $? -ne 0 ]; then
+	#error or eof
+	echo "koniec"
+	break
+    else
+	${ZCAT} ${BASE}/${NEWDIR}/${NEWNAME}${ZEXT} 2>/dev/null|cmp ${TMPFILE} 1>/dev/null 2>&1
+	if [ $? -eq 0 ]; then
+	    #the same - make hardlink
+	    ln -v ${BASE}/${NEWDIR}/${NEWNAME}${ZEXT} ${TODAY}/${NEWDIR}/${NEWNAME}${ZEXT}
+	    if [ $DO_MD5 -eq 1 ]; then
+		ln $BASE/$NEWDIR/$NEWNAME.md5 $TODAY/$NEWDIR/$NEWNAME.md5
+	    fi
+	else
+	    #not the same - copy new
+	    cp -v $TMPFILE $TODAY/$NEWDIR/$NEWNAME
+	    if [ $DO_MD5 -eq 1 ]; then
+		md5sum $TODAY/$NEWDIR/$NEWNAME >$TODAY/$NEWDIR/$NEWNAME.md5
+	    fi
+	    if [ $USE_ZIP -eq 1 ]; then
+		#zip instantly
+		gzip -9 $TODAY/$NEWDIR/$NEWNAME
+	    fi
+	fi
+	STARTCHUNK=$(( $STARTCHUNK+1 ))
+    fi
+done
+
+if [ $USE_ZIP -eq 2 ]; then
+    #zip everything after
+    echo "zipping everything"
+    find $TODAY -type f -regex '.*[0-9][0-9]$' -exec gzip -9v {} \;
+fi
+
+
+#update last sync
+rm lastsync 1>/dev/null 2>&1
+ln -s ${TODAY} lastsync
+
+#clean up
+rm $TMPFILE
