@@ -30,10 +30,11 @@ Because of hard links, it looks like every backup is full backup, any backup in 
 middle could be safely removed, restore from any previous point in time is easy.
 
 For every backup __blockbackup__ creates new directory named from current date/time.  
-After every succesful backup link _lastsync_ is created/updated, so it points 
+After every successful backup link _lastsync_ is created/updated, so it points 
 to last backup. This link also points to reference directory for comparision.
 
 Destination directory structure:
+```
     dest-directory/
     ├── 2016-06-26_211549
     │   ├── 00000
@@ -51,15 +52,16 @@ Destination directory structure:
     │   │   ├── 00001001.md5
     │   ................
     └── lastsync -> 2016-06-26_211549
+```
 
 When enabled, chunks are also compressed. There are 2 modes of operation:
 - compression on the fly (-z). In this mode chunks are compressed while blocks
 are being read. Number of compression threads could be specified by -n option.  
 Using number od thread two or even three times greater then number of cores
 could give almost disk speed processing.
-- compression after whole disk is imaged (-za). This option is to access disk
-for as short time as possible. Whole compression is done after reading all data
-from disk.
+- compression after whole disk is imaged (-za). This option is to decrease access
+disk duraion to as short as possible. Whole compression is done after reading all
+data from disk.
 
 Note on chunk size: while default 128KB is safe value, better performance can be
 achieved using larger chunks (2-4MB).
