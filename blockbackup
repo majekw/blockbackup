@@ -34,12 +34,12 @@ NUMZIPS=4
 
 function usage() {
     echo "ERROR: unknown option/paramter"
-    echo "Usage: blockbackup.sh -s device -d directory [-z|-za] [-c chunk] [-mn]"
+    echo "Usage: blockbackup -s device -d directory [-z|-za] [-n num_zips] [-c chunk] [-mn]"
     echo "	-s|--source	source device"
     echo "	-d|--dest	destination directory"
     echo "	-z|--zip	compress every block right after read/compare"
     echo "	-za|--zip-after	compress new blocks at the end of process"
-    echo "	-n|--num-zips	run maximum N zip processess in parallel (default=4)"
+    echo "	-n|--num-zips	run maximum 'num_zips' zip processess in parallel (default=4)"
     echo "	-c|--chunk	chunk size (default=128k)"
     echo "	-nm|--no-md5	don't generate md5 for every chunk"
     exit 1

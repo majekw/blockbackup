@@ -1,0 +1,144 @@
+#!/bin/bash
+#
+#    blockrestore - Restore archive created by blockbackup
+#
+#
+#    Copyright (C) 2016 Marek Wodzinski
+#
+#    This program is free software: you can redistribute it and/or modify
+#    it under the terms of the GNU General Public License as published by
+#    the Free Software Foundation, either version 3 of the License, or
+#    (at your option) any later version.
+#
+#    This program is distributed in the hope that it will be useful,
+#    but WITHOUT ANY WARRANTY; without even the implied warranty of
+#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#    GNU General Public License for more details.
+#
+#    You should have received a copy of the GNU General Public License
+#    along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+#
+
+
+USE_ZIP=0
+SOURCE=
+DESC=
+CHUNK=
+#DO_MD5=0
+ZCAT=cat
+ZEXT=
+FAST=0
+
+
+function usage() {
+    echo "ERROR: unknown option/paramter"
+    echo "Usage: blockrestore -s directory -d device [-c chunk] [-f]"
+    echo "	-s|--source	source directory"
+    echo "	-d|--dest	destination device"
+    echo "	-c|--chunk	chunk size (default=autodetect)"
+    #echo "	-m|--md5	check md5 for every chunk"
+    echo "	-f|--fast	run in fast mode (could not work in some circumstances!)"
+    exit 1
+}
+
+
+#get/parse parameters
+while true; do
+    case "$1" in
+	-s|--source)
+	    shift
+	    SOURCE="$1"
+	    if [ ! -d "$SOURCE" ]; then
+		echo "ERROR: source must be a directory!"
+		exit 1
+	    fi
+	    ;;
+	-d|--dest)
+	    shift
+	    DEST="$1"
+	    if [ ! -b "$DEST" ]; then
+		echo "ERROR: destination must a device"
+		exit 1
+	    fi
+	    ;;
+	-c|--chunk)
+	    shift
+	    CHUNK=$1
+	    ;;
+	#-m|--md5)
+	#    DO_MD5=1
+	#    ;;
+	-f|--fast)
+	    FAST=1
+	    ;;
+	*)
+	    usage
+	    ;;
+    esac
+    shift
+    if [ -z "$1" ]; then break; fi
+done
+
+if [ -z "$SOURCE" -o -z "$DEST" ]; then usage; fi
+
+#### Some guessing
+
+# get first file in directory
+FIRSTFILE=$(find $SOURCE -type f -regextype posix-extended -regex ".*/[0-9]+/[0-9]+.*" -print -quit)
+if [ -z "$FIRSTFILE" ]; then
+    echo "ERROR: Couldn't find files matching archive"
+    exit 1
+fi
+
+echo "First file used to autodetect: $FIRSTFILE"
+
+# is gzipped?
+echo "$FIRSTFILE"|grep -q "\.gz$"
+if [ $? -eq 0 ]; then
+    USE_ZIP=1
+    ZEXT=.gz
+    ZCAT=zcat
+    echo "Found gziped archive"
+else
+    echo "It seems that archive is not gzipped"
+fi
+
+# chunk handling
+if [ -z "$CHUNK" ]; then
+    # autodetect chunk size
+    CHUNK=$($ZCAT $FIRSTFILE|wc -c)
+    echo "Autodetected chunk size: $CHUNK"
+else
+    echo "Using command line chunk size $CHUNK"
+fi
+
+
+echo "Making restore of $SOURCE to device $DEST.
+Are you sure? (type YES) if so"
+read yesno
+if [ "$yesno" != "YES" ]; then
+    echo "Aborting"
+    exit 1
+fi
+
+echo "Restoring...."
+
+if [ $FAST -eq 0 ]; then
+    # slow but safe restore
+    find $SOURCE -type f -regextype posix-extended -regex ".*/[0-9]+/[0-9]+$ZEXT" -print | while read part; do
+	echo "$part"
+	if [ $USE_ZIP -eq 1 ]; then
+	    part=$(echo "$part"|sed "s/$ZEXT$//")
+	fi
+	CHUNKNR=$((10#$(basename $part)))
+	echo $CHUNKNR
+	$ZCAT $part$ZEXT|dd of=$DEST obs=$CHUNK seek=$CHUNKNR
+    done
+else
+    # fast restore
+    echo " wait a while to find all files in archive, next you can use 'killall -USR1 dd' to check progess"
+    find $SOURCE -type f -regextype posix-extended -regex ".*/[0-9]+/[0-9]+$ZEXT" -print|sort|xargs -n100 -r $ZCAT|dd of=$DEST obs=$CHUNK
+fi
+
+echo " end!"
