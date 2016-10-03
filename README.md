@@ -60,7 +60,7 @@ are being read. Number of compression threads could be specified by -n option.
 Using number od thread two or even three times greater then number of cores
 could give almost disk speed processing.
 - compression after whole disk is imaged (-za). This option is to decrease access
-disk duraion to as short as possible. Whole compression is done after reading all
+disk duration to as short as possible. Whole compression is done after reading all
 data from disk.
 
 Note on chunk size: while default 128KB is safe value, better performance can be
@@ -70,9 +70,9 @@ __Blockrestore__:
 - has chunk size autodetect
 - zip/nozip autodetect
 - two modes of operation:
--- normal (slow) mode where disk offset is calculated for every chunk. Using this
+ - normal (slow) mode where disk offset is calculated for every chunk. Using this
    mode it's possible to restore only part of backup (depending on directory contents).
--- fast mode, where all chunks are sorted and then piped to one _dd_ process, so
+ - fast mode, where all chunks are sorted and then piped to one _dd_ process, so
    it's fast, but can't handle incomplete backups with some files missing.
 
 
