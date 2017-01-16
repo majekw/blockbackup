@@ -25,23 +25,26 @@ USE_ZIP=0
 SOURCE=
 DESC=
 DEDUP=0
-CHUNK=128k
+CHUNK=1M
 DO_MD5=1
 ZCAT=cat
 ZEXT=
 NUMZIPS=4
-
+STARTCHUNK=0
+ENDCHUNK=
 
 function usage() {
     echo "ERROR: unknown option/paramter"
-    echo "Usage: blockbackup -s device -d directory [-z|-za] [-n num_zips] [-c chunk] [-mn]"
-    echo "	-s|--source	source device"
-    echo "	-d|--dest	destination directory"
-    echo "	-z|--zip	compress every block right after read/compare"
-    echo "	-za|--zip-after	compress new blocks at the end of process"
-    echo "	-n|--num-zips	run maximum 'num_zips' zip processess in parallel (default=4)"
-    echo "	-c|--chunk	chunk size (default=128k)"
-    echo "	-nm|--no-md5	don't generate md5 for every chunk"
+    echo "Usage: blockbackup -s device -d directory [-z|-za] [-n num_zips] [-c chunk] [-mn] [-sc start] [-se end]"
+    echo "	-s|--source device	source device"
+    echo "	-d|--dest directory	destination directory"
+    echo "	-z|--zip		compress every block right after read/compare"
+    echo "	-za|--zip-after		compress new blocks at the end of process"
+    echo "	-n|--num-zips N		run maximum N zip processess in parallel (default=4)"
+    echo "	-c|--chunk N		set chunk size to N (default=1M)"
+    echo "	-nm|--no-md5		don't generate md5 for every chunk"
+    echo "	-sc|--start-chunk N	start dump from chunk N (default=0)"
+    echo "	-ec|--end-chunk N	end dump at chunk N (default=end of device)"
     exit 1
 }
 
@@ -86,6 +89,14 @@ while true; do
 	    shift
 	    NUMZIPS=$(($1))
 	    ;;
+	-sc|--start-chunk)
+	    shift
+	    STARTCHUNK=$(($1))
+	    ;;
+	-ec|--end-chunk)
+	    shift
+	    ENDCHUNK=$(($1))
+	    ;;
 	*)
 	    usage
 	    ;;
@@ -115,7 +126,6 @@ fi
 
 
 #START COPY
-STARTCHUNK=0
 while true; do
     NEWNAME=$(printf "%08d\n" $STARTCHUNK)
     echo -n "$NEWNAME : "
@@ -153,6 +163,7 @@ while true; do
 	    fi
 	fi
 	STARTCHUNK=$(( $STARTCHUNK+1 ))
+	[ "$ENDCHUNK" ] && [ $STARTCHUNK -gt $ENDCHUNK ] && break
     fi
 done
 
