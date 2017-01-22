@@ -32,10 +32,11 @@ ZEXT=
 NUMZIPS=4
 STARTCHUNK=0
 ENDCHUNK=
+NOUPDATE=0
 
 function usage() {
     echo "ERROR: unknown option/paramter"
-    echo "Usage: blockbackup -s device -d directory [-z|-za] [-n num_zips] [-c chunk] [-mn] [-sc start] [-se end]"
+    echo "Usage: blockbackup -s device -d directory [-z|-za] [-n num_zips] [-c chunk] [-mn] [-sc start] [-se end] [-nu]"
     echo "	-s|--source device	source device"
     echo "	-d|--dest directory	destination directory"
     echo "	-z|--zip		compress every block right after read/compare"
@@ -45,6 +46,7 @@ function usage() {
     echo "	-nm|--no-md5		don't generate md5 for every chunk"
     echo "	-sc|--start-chunk N	start dump from chunk N (default=0)"
     echo "	-ec|--end-chunk N	end dump at chunk N (default=end of device)"
+    echo "	-nu|--no-update		don't update lastsync link at the end"
     exit 1
 }
 
@@ -96,6 +98,9 @@ while true; do
 	-ec|--end-chunk)
 	    shift
 	    ENDCHUNK=$(($1))
+	    ;;
+	-nu|--no-update)
+	    NOUPDATE=1
 	    ;;
 	*)
 	    usage
@@ -181,6 +186,7 @@ fi
 
 
 #update last sync
-rm lastsync 1>/dev/null 2>&1
-ln -s ${TODAY} lastsync
-
+if [ $NOUPDATE -eq 0 ]; then
+    rm lastsync 1>/dev/null 2>&1
+    ln -s ${TODAY} lastsync
+fi
