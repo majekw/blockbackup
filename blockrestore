@@ -23,10 +23,10 @@
 
 USE_ZIP=0
 SOURCE=
-DESC=
+DEST=
 CHUNK=
 #DO_MD5=0
-ZCAT=cat
+ZCAT="cat"
 ZEXT=
 FAST=0
 
@@ -85,7 +85,7 @@ if [ -z "$SOURCE" -o -z "$DEST" ]; then usage; fi
 #### Some guessing
 
 # get first file in directory
-FIRSTFILE=$(find $SOURCE -type f -regextype posix-extended -regex ".*/[0-9]+/[0-9]+.*" -print -quit)
+FIRSTFILE=$(find "$SOURCE" -type f -regextype posix-extended -regex ".*/[0-9]+/[0-9]+.*" -print -quit)
 if [ -z "$FIRSTFILE" ]; then
     echo "ERROR: Couldn't find files matching archive"
     exit 1
@@ -98,7 +98,7 @@ echo "$FIRSTFILE"|grep -q "\.gz$"
 if [ $? -eq 0 ]; then
     USE_ZIP=1
     ZEXT=.gz
-    ZCAT=zcat
+    ZCAT="zcat"
     echo "Found gziped archive"
 else
     echo "It seems that archive is not gzipped"
@@ -107,7 +107,7 @@ fi
 # chunk handling
 if [ -z "$CHUNK" ]; then
     # autodetect chunk size
-    CHUNK=$($ZCAT $FIRSTFILE|wc -c)
+    CHUNK=$($ZCAT "$FIRSTFILE"|wc -c)
     echo "Autodetected chunk size: $CHUNK"
 else
     echo "Using command line chunk size $CHUNK"
@@ -115,7 +115,7 @@ fi
 
 
 echo "Making restore of $SOURCE to device $DEST.
-Are you sure? (type YES) if so"
+Are you sure? (type YES if so)"
 read yesno
 if [ "$yesno" != "YES" ]; then
     echo "Aborting"
@@ -126,19 +126,19 @@ echo "Restoring...."
 
 if [ $FAST -eq 0 ]; then
     # slow but safe restore
-    find $SOURCE -type f -regextype posix-extended -regex ".*/[0-9]+/[0-9]+$ZEXT" -print | while read part; do
+    find "$SOURCE" -type f -regextype posix-extended -regex ".*/[0-9]+/[0-9]+$ZEXT" -print | while read -r part; do
 	echo "$part"
 	if [ $USE_ZIP -eq 1 ]; then
 	    part=$(echo "$part"|sed "s/$ZEXT$//")
 	fi
-	CHUNKNR=$((10#$(basename $part)))
+	CHUNKNR=$((10#$(basename "$part")))
 	echo $CHUNKNR
-	$ZCAT $part$ZEXT|dd of=$DEST obs=$CHUNK seek=$CHUNKNR
+	$ZCAT "$part$ZEXT"|dd of="$DEST" obs=$CHUNK seek=$CHUNKNR
     done
 else
     # fast restore
     echo " wait a while to find all files in archive, next you can use 'killall -USR1 dd' to check progess"
-    find $SOURCE -type f -regextype posix-extended -regex ".*/[0-9]+/[0-9]+$ZEXT" -print|sort|xargs -n100 -r $ZCAT|dd of=$DEST obs=$CHUNK
+    find "$SOURCE" -type f -regextype posix-extended -regex ".*/[0-9]+/[0-9]+$ZEXT" -print|sort|xargs -n100 -r $ZCAT|dd of="$DEST" obs=$CHUNK
 fi
 
 echo " end!"
