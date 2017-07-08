@@ -23,8 +23,7 @@
 
 USE_ZIP=0
 SOURCE=
-DESC=
-DEDUP=0
+DEST=
 CHUNK=1M
 DO_MD5=1
 ZCAT=cat
@@ -67,7 +66,7 @@ while true; do
 	-s|--source)
 	    shift
 	    SOURCE="$1"
-	    if [ ! -b "$SOURCE" ]; then
+	    if [ ! -b "${SOURCE}" ]; then
 		echo "ERROR: source must be device!"
 		exit 1
 	    fi
@@ -75,7 +74,7 @@ while true; do
 	-d|--dest)
 	    shift
 	    DEST="$1"
-	    if [ ! -d "$DEST" ]; then
+	    if [ ! -d "${DEST}" ]; then
 		echo "ERROR: destination must be existing directory"
 		exit 1
 	    fi
@@ -110,17 +109,17 @@ while true; do
     if [ -z "$1" ]; then break; fi
 done
 
-if [ -z "$SOURCE" -o -z "$DEST" ]; then usage; fi
+if [ -z "${SOURCE}" -o -z "${DEST}" ]; then usage; fi
 
 
 
-echo "Doing incremental backup of device $SOURCE to directory $DEST with chunk size $CHUNK"
+echo "Doing incremental backup of device ${SOURCE} to directory ${DEST} with chunk size ${CHUNK}"
 
 
 TODAY=$(date +%F_%H%M%S)
 
-cd $DEST
-mkdir ${TODAY}
+cd "${DEST}" || exit 1
+mkdir "${TODAY}"
 
 #base
 if [ -L lastsync ]; then
@@ -133,60 +132,60 @@ fi
 #START COPY
 while true; do
     NEWNAME=$(printf "%08d\n" $STARTCHUNK)
-    echo -n "$NEWNAME : "
+    echo -n "${NEWNAME} : "
     NEWDIR=${NEWNAME:0:5}
-    mkdir -p $TODAY/$NEWDIR
+    mkdir -p "${TODAY}/${NEWDIR}"
     
     #read chunk
-    dd if=$SOURCE of=${TODAY}/${NEWDIR}/${NEWNAME} count=1 bs=${CHUNK} skip=${STARTCHUNK}  1>/dev/null 2>&1
+    dd if="${SOURCE}" of="${TODAY}/${NEWDIR}/${NEWNAME}" count=1 bs=${CHUNK} skip=${STARTCHUNK}  1>/dev/null 2>&1
     if [ $? -ne 0 ]; then
 	#error or eof
 	echo "end of source or error"
 	break
     else
-	${ZCAT} ${BASE}/${NEWDIR}/${NEWNAME}${ZEXT} 2>/dev/null|cmp ${TODAY}/${NEWDIR}/${NEWNAME} 1>/dev/null 2>&1
+	${ZCAT} "${BASE}/${NEWDIR}/${NEWNAME}${ZEXT}" 2>/dev/null|cmp "${TODAY}/${NEWDIR}/${NEWNAME}" 1>/dev/null 2>&1
 	if [ $? -eq 0 ]; then
 	    #the same - remove and make hardlink to old one
-	    rm ${TODAY}/${NEWDIR}/${NEWNAME}
-	    ln -v ${BASE}/${NEWDIR}/${NEWNAME}${ZEXT} ${TODAY}/${NEWDIR}/${NEWNAME}${ZEXT}
-	    if [ $DO_MD5 -eq 1 ]; then
-		ln $BASE/$NEWDIR/$NEWNAME.md5 $TODAY/$NEWDIR/$NEWNAME.md5
+	    rm "${TODAY}/${NEWDIR}/${NEWNAME}"
+	    ln -v "${BASE}/${NEWDIR}/${NEWNAME}${ZEXT}" "${TODAY}/${NEWDIR}/${NEWNAME}${ZEXT}"
+	    if [ ${DO_MD5} -eq 1 ]; then
+		ln "${BASE}/${NEWDIR}/${NEWNAME}.md5" "${TODAY}/${NEWDIR}/${NEWNAME}.md5"
 	    fi
 	else
 	    #not the same - leave it
-	    echo "new $TODAY/$NEWDIR/$NEWNAME"
-	    if [ $DO_MD5 -eq 1 ]; then
-		md5sum $TODAY/$NEWDIR/$NEWNAME >$TODAY/$NEWDIR/$NEWNAME.md5
+	    echo "new ${TODAY}/${NEWDIR}/${NEWNAME}"
+	    if [ ${DO_MD5} -eq 1 ]; then
+		md5sum "${TODAY}/${NEWDIR}/${NEWNAME}" >"${TODAY}/${NEWDIR}/${NEWNAME}.md5"
 	    fi
-	    if [ $USE_ZIP -eq 1 ]; then
+	    if [ ${USE_ZIP} -eq 1 ]; then
 		#zip instantly
-		if [ $(jobs|wc -l) -lt $NUMZIPS ]; then
-		    gzip -9 $TODAY/$NEWDIR/$NEWNAME &
+		if [ $(jobs|wc -l) -lt ${NUMZIPS} ]; then
+		    gzip -9 "${TODAY}/${NEWDIR}/${NEWNAME}" &
 		else
-		    gzip -9 $TODAY/$NEWDIR/$NEWNAME
+		    gzip -9 "${TODAY}/${NEWDIR}/${NEWNAME}"
 		fi
 	    fi
 	fi
 	STARTCHUNK=$(( $STARTCHUNK+1 ))
-	[ "$ENDCHUNK" ] && [ $STARTCHUNK -gt $ENDCHUNK ] && break
+	[ "${ENDCHUNK}" ] && [ ${STARTCHUNK} -gt ${ENDCHUNK} ] && break
     fi
 done
 
-if [ $USE_ZIP -eq 2 ]; then
+if [ ${USE_ZIP} -eq 2 ]; then
     #zip everything after
     echo "zipping everything"
-    find $TODAY -type f -regex '.*[0-9][0-9]$'|while read tozip; do
-	if [ $(jobs|wc -l) -le $NUMZIPS ]; then
-	    gzip -9v $tozip &
+    find "${TODAY}" -type f -regex '.*[0-9][0-9]$'|while read tozip; do
+	if [ $(jobs|wc -l) -le ${NUMZIPS} ]; then
+	    gzip -9v "${tozip}" &
 	else
-	    gzip -9v $tozip
+	    gzip -9v "${tozip}"
 	fi
     done
 fi
 
 
 #update last sync
-if [ $NOUPDATE -eq 0 ]; then
+if [ ${NOUPDATE} -eq 0 ]; then
     rm lastsync 1>/dev/null 2>&1
-    ln -s ${TODAY} lastsync
+    ln -s "${TODAY}" lastsync
 fi
