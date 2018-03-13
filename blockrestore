@@ -3,7 +3,7 @@
 #    blockrestore - Restore archive created by blockbackup
 #
 #
-#    Copyright (C) 2016 Marek Wodzinski
+#    Copyright (C) 2016-2018 Marek Wodzinski
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -85,7 +85,7 @@ if [ -z "$SOURCE" -o -z "$DEST" ]; then usage; fi
 #### Some guessing
 
 # get first file in directory
-FIRSTFILE=$(find "$SOURCE" -type f -regextype posix-extended -regex ".*/[0-9]+/[0-9]+.*" -print -quit)
+FIRSTFILE=$(find "$SOURCE" -type f -regextype posix-extended -regex ".*/[0-9]+/[0-9]+(\.gz)?" -print -quit)
 if [ -z "$FIRSTFILE" ]; then
     echo "ERROR: Couldn't find files matching archive"
     exit 1
