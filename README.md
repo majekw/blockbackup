@@ -56,21 +56,22 @@ Destination directory structure:
 
 When enabled, chunks are also compressed. There are 2 modes of operation:
 - compression on the fly (-z). In this mode chunks are compressed while blocks
-are being read. Number of compression threads could be specified by -n option.  
-Using number od thread two or even three times greater then number of cores
+are being read. Number of compression threads could be specified by -n option.
+Using number of threads two or even three times greater than number of cores
 could give almost disk speed processing.
 - compression after whole disk is imaged (-za). This option is to decrease access
 disk duration to as short as possible. Whole compression is done after reading all
 data from disk.
 
-Note on chunk size: while default 128KB is safe value, better performance can be
-achieved using larger chunks (2-4MB).
+Note on chunk size: default is 1MB which is reasonable good value.
+For better performance try using larger chunks, but it may impact
+deduplication efficiency.
 
 __Blockrestore__:
 - has chunk size autodetect
 - zip/nozip autodetect
 - two modes of operation:
- - normal (slow) mode where disk offset is calculated for every chunk. Using this
+ - normal (slow) mode where disk offset is calculated for every chunk. By using this
    mode it's possible to restore only part of backup (depending on directory contents).
  - fast mode, where all chunks are sorted and then piped to one _dd_ process, so
    it's fast, but can't handle incomplete backups with some files missing.
@@ -123,7 +124,7 @@ blockrestore
 Legal
 =====
 
-    Copyright (C) 2016 Marek Wodzinski
+    Copyright (C) 2016-2018 Marek Wodzinski
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
