@@ -3,7 +3,7 @@
 #    blockbackup - Block level inremental backup tool
 #
 #
-#    Copyright (C) 2016 Marek Wodzinski
+#    Copyright (C) 2016-2019 Marek Wodzinski
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -32,10 +32,13 @@ NUMZIPS=4
 STARTCHUNK=0
 ENDCHUNK=
 NOUPDATE=0
+SYMLINK=""
+SKIPSAME=0
+IGNORE_ERR=0
 
 function usage() {
     echo "ERROR: unknown option/paramter"
-    echo "Usage: blockbackup -s device -d directory [-z|-za] [-n num_zips] [-c chunk] [-mn] [-sc start] [-se end] [-nu]"
+    echo "Usage: blockbackup -s device -d directory [-z|-za] [-n num_zips] [-c chunk] [-mn] [-sc start] [-se end] [-nu] [-l] [-ss] [-ie]"
     echo "	-s|--source device	source device"
     echo "	-d|--dest directory	destination directory"
     echo "	-z|--zip		compress every block right after read/compare"
@@ -46,6 +49,9 @@ function usage() {
     echo "	-sc|--start-chunk N	start dump from chunk N (default=0)"
     echo "	-ec|--end-chunk N	end dump at chunk N (default=end of device)"
     echo "	-nu|--no-update		don't update lastsync link at the end"
+    echo "	-l|--symlink		use symbolic links instead of hard links"
+    echo "	-ss|--skip-same		don't put link if reference chunk is the same"
+    echo "	-ie|--ignore-errors	don't stop on dd errors, must be used with --end-chunk"
     exit 1
 }
 
@@ -101,6 +107,15 @@ while true; do
 	-nu|--no-update)
 	    NOUPDATE=1
 	    ;;
+	-l|--symlink)
+	    SYMLINK="-s"
+	    ;;
+	-ss|--skip-same)
+	    SKIPSAME=1
+	    ;;
+	-ie|--ignore-errors)
+	    IGNORE_ERR=1
+	    ;;
 	*)
 	    usage
 	    ;;
@@ -110,7 +125,7 @@ while true; do
 done
 
 if [ -z "${SOURCE}" -o -z "${DEST}" ]; then usage; fi
-
+if [[ $IGNORE_ERR -eq 1 ]] && [[ -z "$ENDCHUNK" ]]; then usage; fi
 
 
 echo "Doing incremental backup of device ${SOURCE} to directory ${DEST} with chunk size ${CHUNK}"
@@ -138,7 +153,7 @@ while true; do
     
     #read chunk
     dd if="${SOURCE}" of="${TODAY}/${NEWDIR}/${NEWNAME}" count=1 bs=${CHUNK} skip=${STARTCHUNK}  1>/dev/null 2>&1
-    if [ $? -ne 0 ]; then
+    if [ $? -ne 0 ] && [[ $IGNORE_ERR -eq 0 ]]; then
 	#error or eof
 	echo "end of source or error"
 	break
@@ -147,9 +162,11 @@ while true; do
 	if [ $? -eq 0 ]; then
 	    #the same - remove and make hardlink to old one
 	    rm "${TODAY}/${NEWDIR}/${NEWNAME}"
-	    ln -v "${BASE}/${NEWDIR}/${NEWNAME}${ZEXT}" "${TODAY}/${NEWDIR}/${NEWNAME}${ZEXT}"
-	    if [ ${DO_MD5} -eq 1 ]; then
-		ln "${BASE}/${NEWDIR}/${NEWNAME}.md5" "${TODAY}/${NEWDIR}/${NEWNAME}.md5"
+	    if [[ $SKIPSAME -eq 0 ]]; then
+		ln -v "$SYMLINK" "${BASE}/${NEWDIR}/${NEWNAME}${ZEXT}" "${TODAY}/${NEWDIR}/${NEWNAME}${ZEXT}"
+		if [ ${DO_MD5} -eq 1 ]; then
+		    ln "$SYMLINK" "${BASE}/${NEWDIR}/${NEWNAME}.md5" "${TODAY}/${NEWDIR}/${NEWNAME}.md5"
+		fi
 	    fi
 	else
 	    #not the same - leave it
